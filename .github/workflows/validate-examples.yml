@@ -48,9 +48,6 @@ jobs:
           - name: docker-app                     # Docker + Pages demo
             path: examples/docker-app
             lint: false                          # Uses node:test, no linter
-          - name: service-containers             # Node.js + PostgreSQL
-            path: examples/service-containers
-            lint: true
           - name: composite-action               # Composite action demo
             path: examples/composite-action
             lint: true
@@ -78,7 +75,69 @@ jobs:
       - name: Test
         run: npm test
 
-  # ===== JOB 3: TEST PYTHON EXAMPLE =====
+  # ===== JOB 3: TEST SERVICE CONTAINERS EXAMPLE =====
+  # Runs the PostgreSQL integration tests with a real database sidecar.
+  # Needs its own job (can't be in the matrix) because it requires
+  # a services: postgres block that other Node.js examples don't need.
+  test-service-containers:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: examples/service-containers  # All steps run in the example dir
+
+    # PostgreSQL must be running before tests begin.
+    services:
+      postgres:
+        image: postgres:16                       # Official PostgreSQL Docker image
+        env:
+          POSTGRES_USER: testuser
+          POSTGRES_PASSWORD: testpass
+          POSTGRES_DB: testdb
+        ports:
+          - 5432:5432                             # Expose on localhost
+        options: >-                               # Health check: wait until PG accepts connections
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: 'npm'
+          cache-dependency-path: examples/service-containers/package-lock.json
+
+      - run: npm ci
+
+      # Wait for PostgreSQL to accept TCP connections before running tests.
+      - name: Wait for PostgreSQL
+        run: |
+          for i in $(seq 1 15); do
+            if nc -z localhost 5432 2>/dev/null; then
+              echo "PostgreSQL ready on attempt $i"
+              exit 0
+            fi
+            echo "Waiting for PostgreSQL... attempt $i"
+            sleep 2
+          done
+          echo "PostgreSQL not ready after 15 attempts" && exit 1
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Test
+        run: npm test
+        env:
+          PGHOST: localhost
+          PGPORT: 5432
+          PGUSER: testuser
+          PGPASSWORD: testpass
+          PGDATABASE: testdb
+
+  # ===== JOB 4: TEST PYTHON EXAMPLE =====
   # Runs Ruff linting + pytest with coverage for the Python calculator example.
   test-python:
     runs-on: ubuntu-latest
@@ -104,7 +163,7 @@ jobs:
       - name: Test                               # Run pytest with coverage
         run: pytest tests/ -v
 
-  # ===== JOB 4: TEST MONOREPO PYTHON BACKEND =====
+  # ===== JOB 5: TEST MONOREPO PYTHON BACKEND =====
   test-monorepo-backend:
     runs-on: ubuntu-latest
     defaults:
@@ -124,7 +183,7 @@ jobs:
       - name: Test
         run: pytest tests/ -v
 
-  # ===== JOB 5: TEST MONOREPO NODE.JS FRONTEND =====
+  # ===== JOB 6: TEST MONOREPO NODE.JS FRONTEND =====
   test-monorepo-frontend:
     runs-on: ubuntu-latest
     defaults:
@@ -147,7 +206,7 @@ jobs:
       - name: Test
         run: npm test
 
-  # ===== JOB 6: BUILD JAVASCRIPT ACTION =====
+  # ===== JOB 7: BUILD JAVASCRIPT ACTION =====
   # Compiles the PR labeler action with ncc and verifies dist/index.js exists.
   build-js-action:
     runs-on: ubuntu-latest
@@ -171,13 +230,14 @@ jobs:
       - name: Verify dist/ was created           # Fail if the build didn't produce output
         run: 'test -f dist/index.js || (echo "BUILD FAILED: dist/index.js not found" && exit 1)'
 
-  # ===== JOB 7: AGGREGATE RESULTS =====
+  # ===== JOB 8: AGGREGATE RESULTS =====
   # Shows a pass/fail summary table on the run summary page.
   # if: always() ensures this runs even when upstream jobs fail.
   summary:
     needs:                                      # Wait for ALL upstream jobs
       - lint-workflows
       - test-nodejs
+      - test-service-containers
       - test-python
       - test-monorepo-backend
       - test-monorepo-frontend
@@ -194,6 +254,7 @@ jobs:
           echo "|-----|--------|" >> "$GITHUB_STEP_SUMMARY"
           echo "| lint-workflows | ${{ needs.lint-workflows.result }}" >> "$GITHUB_STEP_SUMMARY"
           echo "| test-nodejs | ${{ needs.test-nodejs.result }}" >> "$GITHUB_STEP_SUMMARY"
+          echo "| test-service-containers | ${{ needs.test-service-containers.result }}" >> "$GITHUB_STEP_SUMMARY"
           echo "| test-python | ${{ needs.test-python.result }}" >> "$GITHUB_STEP_SUMMARY"
           echo "| test-monorepo-backend | ${{ needs.test-monorepo-backend.result }}" >> "$GITHUB_STEP_SUMMARY"
           echo "| test-monorepo-frontend | ${{ needs.test-monorepo-frontend.result }}" >> "$GITHUB_STEP_SUMMARY"
@@ -204,6 +265,7 @@ jobs:
           for result in \
             "${{ needs.lint-workflows.result }}" \
             "${{ needs.test-nodejs.result }}" \
+            "${{ needs.test-service-containers.result }}" \
             "${{ needs.test-python.result }}" \
             "${{ needs.test-monorepo-backend.result }}" \
             "${{ needs.test-monorepo-frontend.result }}" \
