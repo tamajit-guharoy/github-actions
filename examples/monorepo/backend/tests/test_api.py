@@ -1,4 +1,4 @@
-from src.api import process_order, validate_email
+from api import process_order, validate_email
 
 
 class TestProcessOrder:
