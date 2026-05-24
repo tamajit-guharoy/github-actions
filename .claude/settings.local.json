@@ -1,0 +1,8 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(Get-ChildItem -Path \"C:\\\\Users\\\\guhar\\\\ws\\\\github-actions\" -Recurse)",
+      "Bash(Select-Object FullName, Length)"
+    ]
+  }
+}

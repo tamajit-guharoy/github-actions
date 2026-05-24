@@ -1,0 +1,82 @@
+# =============================================================================
+# Deploy to GitHub Pages Workflow
+# =============================================================================
+# Deploys static site content to GitHub Pages on every push to main.
+# Only triggers when files in docs/ or this workflow file change.
+# Demonstrates: path filtering, concurrency control, granular permissions,
+#               environment with deployment URL, OIDC-based deployment.
+#
+# IMPORTANT: You must enable GitHub Pages in your repo settings:
+#   Settings → Pages → Source: GitHub Actions
+# =============================================================================
+
+name: Deploy to GitHub Pages                   # Display name shown in the Actions tab
+
+# ---------- TRIGGERS ----------
+on:
+  push:
+    branches: [main]                           # Only deploy from the default branch
+    paths:                                     # Only trigger when relevant files change
+      - 'docs/**'                              # Your static site source (Markdown, HTML, etc.)
+      - '.github/workflows/deploy-pages.yml'   # This workflow file itself
+
+# ---------- PERMISSIONS ----------
+# Grant the workflow exactly what it needs — nothing more.
+# pages: write  → allows creating and updating the Pages site
+# id-token: write → allows OIDC token generation (no PAT or deploy key needed)
+permissions:
+  contents: read                               # Only need to read the repo contents
+  pages: write                                 # Allow writing to GitHub Pages
+  id-token: write                              # Allow OIDC token for trusted deployment
+
+# ---------- CONCURRENCY ----------
+# Only one Pages deployment at a time.
+# If a new push arrives while a deploy is in progress, cancel the old one
+# (pages deployments are serial — there's no point queuing stale runs).
+concurrency:
+  group: pages                                 # All runs in this workflow share the same group
+  cancel-in-progress: true                     # Auto-cancel previous queued/active runs
+
+# ---------- JOBS ----------
+jobs:
+
+  # ===== BUILD JOB =====
+  # Builds the static site from docs/ and uploads it as an artifact.
+  build:
+    runs-on: ubuntu-latest                     # GitHub-hosted Linux runner
+
+    steps:
+      # Step 1: Clone the repository
+      - uses: actions/checkout@v4
+
+      # Step 2: Configure GitHub Pages settings
+      #         Detects the static site generator and sets base URL, etc.
+      - uses: actions/configure-pages@v4
+
+      # Step 3: Build the site with Jekyll (GitHub Pages' default engine)
+      #         Reads _config.yml from docs/ and produces _site/
+      - uses: actions/jekyll-build-pages@v1
+
+      # Step 4: Package the built site into a Pages-compatible artifact
+      #         This is the artifact that deploy-pages expects.
+      - uses: actions/upload-pages-artifact@v3
+
+  # ===== DEPLOY JOB =====
+  # Takes the build artifact and deploys it to GitHub Pages.
+  deploy:
+    needs: build                               # Must wait for build to finish
+    runs-on: ubuntu-latest
+
+    # Deployments appear under this environment in the repo UI.
+    # 'url' is populated dynamically from the deployment step output —
+    # it shows the live URL in the Actions run summary.
+    environment:
+      name: github-pages                       # Environment name (shown in repo Deployments)
+      url: ${{ steps.deployment.outputs.page_url }}
+
+    steps:
+      # Step 5: Deploy the artifact to GitHub Pages
+      #         Uses OIDC (no deploy key or PAT needed).
+      #         Sets the output 'page_url' referenced in environment.url above.
+      - id: deployment                         # id so we can reference its outputs
+        uses: actions/deploy-pages@v4

@@ -1,0 +1,83 @@
+# =============================================================================
+# Python CI Workflow
+# =============================================================================
+# Runs on every push and pull request to the 'main' branch.
+# Demonstrates: checkout, setup-python, pip caching, matrix strategy,
+#               ruff linting, pytest with coverage, junitxml output,
+#               and if: always() for artifact upload even on failure.
+# =============================================================================
+
+name: Python CI                               # Display name shown in the Actions tab
+
+# ---------- TRIGGERS ----------
+on:
+  push:
+    branches: [main]                           # Run on every push to main
+  pull_request:
+    branches: [main]                           # Run when a PR targets main
+
+# ---------- JOBS ----------
+jobs:
+
+  # ===== LINT JOB =====
+  lint:
+    runs-on: ubuntu-latest                     # GitHub-hosted Linux runner
+
+    steps:
+      # Step 1: Clone the repository
+      - uses: actions/checkout@v4
+
+      # Step 2: Run Ruff (fast Python linter + formatter)
+      #         Uses the official ruff-action — no pip install needed.
+      - uses: astral-sh/ruff-action@v3
+        with:
+          args: "check"                        # 'check' = lint only; use 'format --check' for formatting
+
+  # ===== TEST JOB =====
+  # Runs AFTER lint passes. Tests across 4 Python versions in parallel.
+  test:
+    needs: lint                                # Only run after lint succeeds
+    runs-on: ubuntu-latest
+
+    # Matrix strategy: each Python version runs in its own parallel job.
+    strategy:
+      matrix:
+        python-version: ["3.10", "3.11", "3.12", "3.13"]
+
+    steps:
+      # Step 1: Clone the repository
+      - uses: actions/checkout@v4
+
+      # Step 2: Install the matrix-specific Python version
+      #         'cache: pip' auto-caches pip downloads for faster runs
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+          cache: "pip"                          # Caches ~/.cache/pip
+
+      # Step 3: Upgrade pip to latest (ensures modern resolver)
+      - run: python -m pip install --upgrade pip
+
+      # Step 4: Install the package + dev dependencies (pytest, pytest-cov, ruff)
+      #         '.[dev]' installs the [project.optional-dependencies] dev group
+      - run: pip install .[dev]
+
+      # Step 5: Run tests with coverage and junitxml output
+      #         --cov=src          → measure coverage for the src/ package
+      #         --cov-report=term-missing → show uncovered lines in the log
+      #         --junitxml=        → machine-readable report (used by artifact)
+      - name: Run tests with coverage
+        run: |
+          python -m pytest tests/ -v \
+            --cov=src \
+            --cov-report=term-missing \
+            --junitxml=test-results.xml
+
+      # Step 6: Upload test results as an artifact
+      #         if: always() ensures this runs even when tests FAIL —
+      #         so you can download the XML report and debug failures.
+      - uses: actions/upload-artifact@v4
+        if: always()                            # Run regardless of test pass/fail
+        with:
+          name: test-results-py-${{ matrix.python-version }}
+          path: test-results.xml

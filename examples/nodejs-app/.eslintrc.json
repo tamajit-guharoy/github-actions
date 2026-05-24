@@ -1,0 +1,11 @@
+{
+  "env": {
+    "node": true,
+    "jest": true,
+    "es2024": true
+  },
+  "rules": {
+    "no-unused-vars": "warn",
+    "semi": ["error", "always"]
+  }
+}

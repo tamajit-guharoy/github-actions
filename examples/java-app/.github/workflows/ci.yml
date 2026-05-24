@@ -1,0 +1,78 @@
+# =============================================================================
+# Java CI Workflow
+# =============================================================================
+# Runs on every push and pull request to the 'main' branch.
+# Demonstrates: checkout, setup-java with Temurin distribution,
+#               Maven caching, matrix strategy across LTS versions,
+#               Checkstyle linting, JUnit 5 tests via Surefire,
+#               and if: always() for artifact upload even on failure.
+# =============================================================================
+
+name: Java CI                                 # Display name shown in the Actions tab
+
+# ---------- TRIGGERS ----------
+on:
+  push:
+    branches: [main]                           # Run on every push to main
+  pull_request:
+    branches: [main]                           # Run when a PR targets main
+
+# ---------- JOBS ----------
+jobs:
+
+  # ===== LINT JOB =====
+  lint:
+    runs-on: ubuntu-latest                     # GitHub-hosted Linux runner
+
+    steps:
+      # Step 1: Clone the repository
+      - uses: actions/checkout@v4
+
+      # Step 2: Install Java 21 (Temurin Eclipse Adoptium distribution)
+      #         'cache: maven' auto-caches ~/.m2/repository for fast builds
+      - uses: actions/setup-java@v4
+        with:
+          java-version: "21"                    # Pin the compiler version for lint
+          distribution: "temurin"               # Eclipse Adoptium (free, open-source JDK)
+          cache: "maven"                        # Caches Maven dependencies
+
+      # Step 3: Run Checkstyle for code style enforcement
+      #         Configured via the maven-checkstyle-plugin in pom.xml
+      - run: mvn checkstyle:check
+
+  # ===== TEST JOB =====
+  # Runs AFTER lint passes. Tests across 3 Java LTS versions in parallel.
+  test:
+    needs: lint                                # Only run after lint succeeds
+    runs-on: ubuntu-latest
+
+    # Matrix strategy: each Java version runs in its own parallel job.
+    strategy:
+      matrix:
+        java-version: [17, 21, 23]             # LTS versions + latest
+
+    steps:
+      # Step 1: Clone the repository
+      - uses: actions/checkout@v4
+
+      # Step 2: Install the matrix-specific Java version
+      - uses: actions/setup-java@v4
+        with:
+          java-version: ${{ matrix.java-version }}
+          distribution: "temurin"               # Eclipse Adoptium
+          cache: "maven"                        # Cached per Java version
+
+      # Step 3: Run JUnit 5 tests
+      #         --batch-mode  → non-interactive (required in CI)
+      #         maven-surefire-plugin generates XML reports in target/surefire-reports/
+      - run: mvn --batch-mode test
+
+      # Step 4: Upload Surefire test reports as an artifact
+      #         if: always() → uploads reports even when tests fail,
+      #         so you can review failures in the Actions UI.
+      - name: Upload test results
+        uses: actions/upload-artifact@v4
+        if: always()                            # Run regardless of test pass/fail
+        with:
+          name: test-results-java-${{ matrix.java-version }}
+          path: target/surefire-reports/        # Surefire XML output directory

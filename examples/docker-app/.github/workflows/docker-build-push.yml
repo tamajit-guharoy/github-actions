@@ -1,0 +1,72 @@
+# =============================================================================
+# Docker Build & Push Workflow
+# =============================================================================
+# Runs on pushes to main and on version tags (v1.0, v2.3, etc.).
+# Demonstrates: docker/buildx for multi-platform builds,
+#               docker/login for registry auth via secrets,
+#               docker/metadata for automatic tag generation,
+#               docker/build-push with GitHub Actions cache backend,
+#               multi-stage Dockerfile builds.
+#
+# REQUIRED SECRETS (set in repo Settings → Secrets and variables → Actions):
+#   DOCKERHUB_USERNAME  — your Docker Hub username
+#   DOCKERHUB_TOKEN     — a Docker Hub personal access token (NOT your password)
+# =============================================================================
+
+name: Docker Build & Push                     # Display name shown in the Actions tab
+
+# ---------- TRIGGERS ----------
+on:
+  push:
+    branches: [main]                           # Run on every push to main (builds :latest)
+    tags: ['v*']                               # Run on version tags like v1.0, v2.3.0
+
+# ---------- JOBS ----------
+jobs:
+
+  # Single job that builds and pushes the Docker image
+  build-and-push:
+    runs-on: ubuntu-latest                     # GitHub-hosted Linux runner
+
+    steps:
+      # Step 1: Clone the repository
+      - uses: actions/checkout@v4
+
+      # Step 2: Set up Docker Buildx
+      #         Enables multi-platform builds (linux/amd64, linux/arm64)
+      #         and the BuildKit cache backends used later.
+      - uses: docker/setup-buildx-action@v3
+
+      # Step 3: Log in to Docker Hub
+      #         Credentials come from repository secrets — never hardcoded.
+      #         Use a token (not your password) for better security.
+      - uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      # Step 4: Extract metadata (tags and labels) from the git context
+      #         type=ref,event=branch  → main branch → :main tag
+      #         type=ref,event=tag     → v1.0 tag    → :1.0, :latest tag
+      #         type=sha,prefix=       → commit SHA  → :abc1234 tag
+      - name: Extract metadata
+        id: meta                                 # id is required to reference outputs
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ secrets.DOCKERHUB_USERNAME }}/my-app
+          tags: |
+            type=ref,event=branch                # Tag with branch name
+            type=ref,event=tag                   # Tag with version (from git tag)
+            type=sha,prefix=                     # Tag with short commit SHA
+
+      # Step 5: Build the Docker image and push to Docker Hub
+      #         cache-from: type=gha  → restore build cache from GitHub Actions
+      #         cache-to: type=gha,mode=max → save ALL layers to GHA cache
+      #         mode=max caches intermediate layers so even partial rebuilds are fast
+      - uses: docker/build-push-action@v6
+        with:
+          push: true                             # Actually push (not just dry-run)
+          tags: ${{ steps.meta.outputs.tags }}   # From metadata action above
+          labels: ${{ steps.meta.outputs.labels }} # OCI labels (org.opencontainers.image.*)
+          cache-from: type=gha                   # Read previous build cache
+          cache-to: type=gha,mode=max            # Write all layers to GHA cache
