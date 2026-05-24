@@ -46,7 +46,7 @@ jobs:
         ports:
           - 5432:5432                             # host:container — expose on localhost
         options: >-                               # Health check: wait until PG is ready
-          --health-cmd pg_isready
+          --health-cmd pg_isready -U testuser -d testdb
           --health-interval 10s
           --health-timeout 5s
           --health-retries 5
@@ -62,6 +62,20 @@ jobs:
           cache-dependency-path: examples/service-containers/package-lock.json
 
       - run: npm ci                              # Clean install (respects lockfile)
+
+      # Double-check PostgreSQL is accepting TCP connections before tests.
+      # nc (netcat) is pre-installed on ubuntu-latest runners.
+      - name: Wait for PostgreSQL
+        run: |
+          for i in $(seq 1 15); do
+            if nc -z localhost 5432 2>/dev/null; then
+              echo "PostgreSQL ready on attempt $i"
+              exit 0
+            fi
+            echo "Waiting for PostgreSQL... attempt $i"
+            sleep 2
+          done
+          echo "PostgreSQL not ready after 15 attempts" && exit 1
 
       # The env vars tell the pg driver how to connect to the service container.
       # They match the credentials configured in the services: block above.
