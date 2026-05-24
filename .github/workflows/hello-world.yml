@@ -42,7 +42,7 @@ jobs:
       # Step 3: Show which commit triggered this run.
       # ${{ github.sha }} is an expression — replaced at runtime.
       - name: Show commit SHA
-        run: echo "Triggered by commit: ${{ github.sha }}"
+        run: 'echo "Triggered by commit: ${{ github.sha }}"'
 
       # Step 4: Print info about the runner environment.
       # The pipe (|) lets us write multi-line shell scripts.

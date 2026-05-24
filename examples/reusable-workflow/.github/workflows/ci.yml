@@ -24,20 +24,20 @@ jobs:
   # ===== BUILD WITH DEFAULT INPUTS (NODE 20, LINT ON) =====
   # The reusable workflow runs as a separate job with its own runner.
   build-default:
-    uses: ./.github/workflows/_build.yml    # Path to the reusable workflow
+    uses: ./.github/workflows/_build.yml@main    # Path to the reusable workflow
     # No 'with:' — uses all defaults (node-version: 20, run-lint: true)
 
   # ===== BUILD WITH NODE 22 =====
   # Override the node-version input. Same workflow, different version.
   build-node-22:
-    uses: ./.github/workflows/_build.yml
+    uses: ./.github/workflows/_build.yml@main
     with:
       node-version: '22'
 
   # ===== BUILD WITHOUT LINTING =====
   # Useful when linting is handled elsewhere or during rapid iteration.
   build-no-lint:
-    uses: ./.github/workflows/_build.yml
+    uses: ./.github/workflows/_build.yml@main
     with:
       run-lint: false
 
@@ -45,7 +45,7 @@ jobs:
   # If the project uses private npm packages, pass the token as a secret.
   # The reusable workflow uses it for npm ci authentication.
   build-with-token:
-    uses: ./.github/workflows/_build.yml
+    uses: ./.github/workflows/_build.yml@main
     with:
       node-version: '20'
     secrets:

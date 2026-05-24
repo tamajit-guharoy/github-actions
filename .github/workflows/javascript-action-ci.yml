@@ -49,7 +49,7 @@ jobs:
 
       # Fail the job if the build didn't produce the expected output.
       - name: Verify dist/index.js exists
-        run: test -f dist/index.js || (echo "BUILD FAILED: dist/index.js not found" && exit 1)
+        run: 'test -f dist/index.js || (echo "BUILD FAILED: dist/index.js not found" && exit 1)'
 
       # Upload the compiled bundle as an artifact for inspection/download.
       - uses: actions/upload-artifact@v4
