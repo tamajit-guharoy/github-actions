@@ -30,13 +30,13 @@ jobs:
   # No 'with:' → uses all defaults (node-version: 20, run-lint: true).
   # The reusable workflow runs as a SEPARATE job with its own runner.
   build-default:
-    uses: ./examples/reusable-workflow/.github/workflows/_build.yml@main  # Path to the reusable workflow
+    uses: tamajit-guharoy/github-actions/examples/reusable-workflow/.github/workflows/_build.yml@main  # Path to the reusable workflow
 
   # ===== CALL WITH NODE 22 =====
   # Override the node-version input. Same workflow, different version.
   # Each 'uses:' creates a fresh runner — no state shared between calls.
   build-node-22:
-    uses: ./examples/reusable-workflow/.github/workflows/_build.yml@main
+    uses: tamajit-guharoy/github-actions/examples/reusable-workflow/.github/workflows/_build.yml@main
     with:
       node-version: '22'                         # Override: use Node 22
 
