@@ -38,7 +38,8 @@ jobs:
       - id: ci                                   # id so we can reference outputs
         uses: ./examples/composite-action/.github/actions/setup-test  # Local composite action path
         with:
-          node-version: '20'                     # Input: Node version to install
+          working-directory: 'examples/composite-action'  # Where package.json lives
+          node-version:'20'                     # Input: Node version to install
           lint: 'true'                           # Input: run linter? (true/false)
 
       # Reference the action's output — defined in action.yml as test-result

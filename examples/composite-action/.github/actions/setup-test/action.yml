@@ -47,6 +47,7 @@ runs:
       with:
         node-version: ${{ inputs.node-version }}
         cache: 'npm'
+        cache-dependency-path: ${{ inputs.working-directory }}/package-lock.json
 
     # Step 2: Install dependencies (clean install — respects lockfile)
     - name: Install dependencies
