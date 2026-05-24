@@ -39,7 +39,7 @@ jobs:
         uses: ./examples/composite-action/.github/actions/setup-test  # Local composite action path
         with:
           working-directory: 'examples/composite-action'  # Where package.json lives
-          node-version:'20'                     # Input: Node version to install
+          node-version: '20'                     # Input: Node version to install
           lint: 'true'                           # Input: run linter? (true/false)
 
       # Reference the action's output — defined in action.yml as test-result
@@ -57,6 +57,7 @@ jobs:
       - id: ci                                   # Same action, different inputs
         uses: ./examples/composite-action/.github/actions/setup-test
         with:
+          working-directory: 'examples/composite-action'  # Where package.json lives
           node-version: '22'                     # Override: use Node 22 instead of 20
           lint: 'true'                           # Still run linting
 
