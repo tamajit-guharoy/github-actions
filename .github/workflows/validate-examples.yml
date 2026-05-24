@@ -169,7 +169,7 @@ jobs:
         run: npm run build
 
       - name: Verify dist/ was created           # Fail if the build didn't produce output
-        run: test -f dist/index.js || (echo "BUILD FAILED: dist/index.js not found" && exit 1)
+        run: 'test -f dist/index.js || (echo "BUILD FAILED: dist/index.js not found" && exit 1)'
 
   # ===== JOB 7: AGGREGATE RESULTS =====
   # Shows a pass/fail summary table on the run summary page.
