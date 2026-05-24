@@ -1,0 +1,66 @@
+# =============================================================================
+# Hello World — Your Very First Workflow
+# =============================================================================
+# This is the simplest possible GitHub Actions workflow. It demonstrates:
+#   - How to name a workflow
+#   - How to define triggers (push + manual dispatch)
+#   - How to write a job with shell steps
+#   - How to use multi-line run commands
+#
+# Copy this file to your repo as .github/workflows/hello.yml and push.
+# Then open the Actions tab to see it run.
+# =============================================================================
+
+name: Hello World                              # Name shown in the Actions tab
+
+# ---------- TRIGGERS ----------
+# This workflow runs on push and can also be triggered manually
+# from the Actions tab (great for testing without a new commit).
+on:
+  push:                                        # Trigger on every git push
+    branches: [main]                           # Only the main branch
+  workflow_dispatch:                           # Allow manual "Run workflow" button
+
+# ---------- JOBS ----------
+# A workflow contains one or more jobs. Here we have just one.
+jobs:
+
+  # Job 1: Prints hello and some environment info.
+  # Job IDs are up to you — use descriptive names.
+  greet:
+    # runs-on tells GitHub what kind of machine to use.
+    # ubuntu-latest is the newest Ubuntu LTS available on GitHub.
+    runs-on: ubuntu-latest
+
+    # Steps run sequentially inside the job. They can be actions or shell commands.
+    steps:
+
+      # Step 1: Check out your repository code onto the runner.
+      # Without this, the runner has an empty directory.
+      - name: Check out the repo
+        uses: actions/checkout@v4
+
+      # Step 2: A simple shell command.
+      - name: Say hello
+        run: echo "Hello, world! 👋"
+
+      # Step 3: Print the commit SHA that triggered this run.
+      # ${{ github.sha }} is an expression — GitHub replaces it with the actual SHA.
+      - name: Show the commit SHA
+        run: echo "Triggered by commit: ${{ github.sha }}"
+
+      # Step 4: Show the runner's OS and environment.
+      # The pipe (|) lets us write multi-line commands.
+      - name: Show runner info
+        run: |
+          echo "Runner OS: $(uname -a)"
+          echo "Runner user: $(whoami)"
+          echo "Current directory: $(pwd)"
+
+      # Step 5: List the files in the repo (proves checkout worked).
+      - name: List repo files
+        run: ls -la
+
+      # Step 6: A final confirmation that everything worked.
+      - name: Done
+        run: echo "All steps completed successfully!"

@@ -1,0 +1,76 @@
+# =============================================================================
+# Monorepo CI — Cross-Language Build with Path Filtering
+# =============================================================================
+# A monorepo with a Node.js frontend and Python backend. This workflow
+# demonstrates: path filtering on triggers, job-level working-directory defaults,
+# running only the jobs relevant to changed code, cross-language CI in one file.
+# =============================================================================
+
+name: Monorepo CI
+
+# ---------- TRIGGERS ----------
+# Run on pushes/PRs. The paths filter ensures we only run CI when source
+# code changes — not when only the README is updated.
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'frontend/**'
+      - 'backend/**'
+      - '.github/workflows/ci.yml'
+  pull_request:
+    branches: [main]
+    paths:
+      - 'frontend/**'
+      - 'backend/**'
+      - '.github/workflows/ci.yml'
+
+# ---------- JOBS ----------
+jobs:
+
+  # ===== FRONTEND (NODE.JS) =====
+  # Uses job-level 'defaults.run.working-directory' so all run: commands
+  # execute relative to ./frontend — no need to repeat it on every step.
+  frontend:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: ./frontend             # All run: steps use this directory
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: 'npm'
+          cache-dependency-path: frontend/package-lock.json
+
+      - run: npm ci                               # Runs in ./frontend
+      - run: npm run lint                         # Runs in ./frontend
+      - run: npm test                             # Runs in ./frontend
+
+  # ===== BACKEND (PYTHON) =====
+  # Same pattern for Python — defaults.run.working-directory keeps it clean.
+  backend:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: ./backend              # All run: steps use ./backend
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: 'pip'
+          cache-dependency-path: backend/pyproject.toml
+
+      - run: pip install .[dev]                   # Runs in ./backend
+
+      - name: Lint with Ruff
+        uses: astral-sh/ruff-action@v3
+        with:
+          args: "check"
+          src: "./backend"
+
+      - run: pytest tests/ -v                     # Runs in ./backend

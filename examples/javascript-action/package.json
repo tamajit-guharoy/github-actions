@@ -1,0 +1,19 @@
+{
+  "name": "pr-labeler-action",
+  "version": "1.0.0",
+  "description": "Auto-label PRs based on changed files",
+  "main": "dist/index.js",
+  "scripts": {
+    "build": "ncc build index.js -o dist",
+    "test": "jest"
+  },
+  "dependencies": {
+    "@actions/core": "^1.11.0",
+    "@actions/github": "^6.0.0",
+    "minimatch": "^10.0.0"
+  },
+  "devDependencies": {
+    "@vercel/ncc": "^0.38.0",
+    "jest": "^30.0.0"
+  }
+}

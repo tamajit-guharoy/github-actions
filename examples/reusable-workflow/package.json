@@ -1,0 +1,14 @@
+{
+  "name": "reusable-workflow-example",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": {
+    "test": "jest",
+    "lint": "eslint .",
+    "build": "mkdir -p dist && cp index.js dist/"
+  },
+  "devDependencies": {
+    "eslint": "^9.0.0",
+    "jest": "^30.0.0"
+  }
+}

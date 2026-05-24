@@ -1,0 +1,61 @@
+# =============================================================================
+# Issue Triage — GitHub Script Example
+# =============================================================================
+# When a new issue is opened, adds priority labels based on keywords in the
+# title and body. Demonstrates: string matching in JavaScript, dynamic label
+# assignment, reading issue context.
+# =============================================================================
+
+name: Issue Triage
+
+on:
+  issues:
+    types: [opened]
+
+permissions:
+  issues: write
+
+jobs:
+  triage:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/github-script@v7
+        with:
+          script: |
+            const issue = context.payload.issue;
+            const title = issue.title.toLowerCase();
+            const body = (issue.body || '').toLowerCase();
+
+            const labels = new Set();
+
+            // ----- Keyword-based labeling -----
+            if (title.includes('bug') || body.includes('bug')) {
+              labels.add('bug');
+            }
+            if (title.includes('feature') || title.includes('enhancement') || body.includes('feature request')) {
+              labels.add('enhancement');
+            }
+            if (title.includes('doc') || body.includes('documentation') || body.includes('readme')) {
+              labels.add('documentation');
+            }
+            if (title.includes('question') || body.includes('how do i')) {
+              labels.add('question');
+            }
+            if (body.includes('security') || title.includes('vulnerability')) {
+              labels.add('security');
+            }
+
+            // ----- Always add the triage label -----
+            labels.add('triage');
+
+            if (labels.size > 0) {
+              await github.rest.issues.addLabels({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: context.issue.number,
+                labels: [...labels]
+              });
+              core.info(`Applied labels: ${[...labels].join(', ')}`);
+            } else {
+              core.info('No keyword matches — only "triage" label added');
+            }

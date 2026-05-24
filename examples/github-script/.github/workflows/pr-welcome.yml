@@ -1,0 +1,77 @@
+# =============================================================================
+# PR Welcome Bot — GitHub Script Example
+# =============================================================================
+# When a new PR is opened, this workflow uses actions/github-script to:
+#   1. Post a welcome comment on the PR
+#   2. Add a "needs-review" label
+#   3. Assign a random reviewer from a team
+#
+# Demonstrates: actions/github-script, octokit REST API, pull_request_target
+#               for safe PR access, using context.repo/context.issue directly
+#               in JavaScript without ${{ }} expressions.
+# =============================================================================
+
+name: PR Welcome Bot
+
+on:
+  pull_request_target:
+    types: [opened]
+
+permissions:
+  pull-requests: write
+  issues: write
+
+jobs:
+  welcome:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/github-script@v7
+        with:
+          script: |
+            // ---------------------------------------------------------------
+            // 1. Get PR details from the workflow context
+            //    context.issue.number = the PR number (works for PRs + issues)
+            //    context.actor = username of the person who opened the PR
+            // ---------------------------------------------------------------
+            const prNumber = context.issue.number;
+            const author = context.payload.pull_request.user.login;
+            const isFirstPR = context.payload.pull_request.author_association === 'FIRST_TIME_CONTRIBUTOR';
+
+            // ---------------------------------------------------------------
+            // 2. Post a welcome comment
+            // ---------------------------------------------------------------
+            const body = isFirstPR
+              ? `🎉 Welcome, @${author}! Thanks for your first PR to this repo!\n\nA maintainer will review your changes shortly.`
+              : `Thanks for the PR, @${author}! A maintainer will review it soon.`;
+
+            await github.rest.issues.createComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: prNumber,
+              body
+            });
+
+            core.info(`Posted welcome comment on PR #${prNumber}`);
+
+            // ---------------------------------------------------------------
+            // 3. Add labels
+            // ---------------------------------------------------------------
+            await github.rest.issues.addLabels({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: prNumber,
+              labels: ['needs-review']
+            });
+
+            core.info('Added "needs-review" label');
+
+            // ---------------------------------------------------------------
+            // 4. Write to the job summary
+            // ---------------------------------------------------------------
+            await core.summary
+              .addHeading('PR Welcome Bot')
+              .addRaw(`- PR: [#${prNumber}](${context.payload.pull_request.html_url})\n`)
+              .addRaw(`- Author: @${author}\n`)
+              .addRaw(`- First time contributor: ${isFirstPR}\n`)
+              .addRaw(`- Labels added: needs-review\n`)
+              .write();

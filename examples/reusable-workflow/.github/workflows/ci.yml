@@ -1,0 +1,64 @@
+# =============================================================================
+# CI Workflow — Caller of the Reusable Build Workflow
+# =============================================================================
+# This workflow calls the reusable workflow at _build.yml with different
+# inputs for each call. Each call creates a SEPARATE job on its own runner.
+#
+# Demonstrates: calling a reusable workflow with 'uses:', passing inputs
+#               and secrets, using outputs from the called workflow,
+#               calling the same workflow multiple times with different params.
+# =============================================================================
+
+name: CI using Reusable Workflow
+
+# ---------- TRIGGERS ----------
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+# ---------- JOBS ----------
+jobs:
+
+  # ===== BUILD WITH DEFAULT INPUTS (NODE 20, LINT ON) =====
+  # The reusable workflow runs as a separate job with its own runner.
+  build-default:
+    uses: ./.github/workflows/_build.yml    # Path to the reusable workflow
+    # No 'with:' — uses all defaults (node-version: 20, run-lint: true)
+
+  # ===== BUILD WITH NODE 22 =====
+  # Override the node-version input. Same workflow, different version.
+  build-node-22:
+    uses: ./.github/workflows/_build.yml
+    with:
+      node-version: '22'
+
+  # ===== BUILD WITHOUT LINTING =====
+  # Useful when linting is handled elsewhere or during rapid iteration.
+  build-no-lint:
+    uses: ./.github/workflows/_build.yml
+    with:
+      run-lint: false
+
+  # ===== BUILD WITH PRIVATE REGISTRY TOKEN =====
+  # If the project uses private npm packages, pass the token as a secret.
+  # The reusable workflow uses it for npm ci authentication.
+  build-with-token:
+    uses: ./.github/workflows/_build.yml
+    with:
+      node-version: '20'
+    secrets:
+      NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
+
+  # ===== REPORT RESULTS =====
+  # Shows how to consume outputs from a reusable workflow via 'needs'.
+  report:
+    needs: [build-default, build-node-22, build-no-lint]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Report outcomes
+        run: |
+          echo "Default (Node 20): ${{ needs.build-default.outputs.test-outcome }}"
+          echo "Node 22:           ${{ needs.build-node-22.outputs.test-outcome }}"
+          echo "No lint:           ${{ needs.build-no-lint.outputs.test-outcome }}"

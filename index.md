@@ -102,12 +102,31 @@ A hands-on guide to automating your software workflows with GitHub Actions.
 
 Working example applications with full CI/CD workflows that you can copy and push to GitHub right now:
 
-- [Node.js Express API](examples/nodejs-app/) — lint, test matrix, coverage artifacts
-- [Python Calculator](examples/python-app/) — lint, test matrix across 4 Python versions
-- [Java Maven (JUnit 5)](examples/java-app/) — lint, test matrix across 3 Java versions
-- [Docker Build & Push](examples/docker-app/) — multi-stage build, push to Docker Hub with GHA cache
+### Getting started
+- [Hello World](examples/hello-world/) — the simplest possible workflow to run as your very first Actions experience
 
-Each example includes a real app, real tests, and a working `.github/workflows/ci.yml` (or equivalent).
+### CI pipelines
+- [Node.js Express API](examples/nodejs-app/) — lint → test matrix (18/20/22), coverage artifacts
+- [Python Calculator](examples/python-app/) — lint (Ruff) → test matrix (3.10–3.13), JUnit XML, coverage
+- [Java Maven (JUnit 5)](examples/java-app/) — lint (Checkstyle) → test matrix (17/21/23), Surefire reports
+- [Monorepo (Node.js + Python)](examples/monorepo/) — cross-language CI with path filtering and working-directory defaults
+
+### Docker & deployment
+- [Docker Build & Push](examples/docker-app/) — multi-stage build, push to Docker Hub with GHA cache, GitHub Pages deploy
+
+### Service containers
+- [PostgreSQL Integration Tests](examples/service-containers/) — Node.js + real Postgres database, health checks, migration before test
+
+### Custom actions & reusable workflows
+- [Composite Action](examples/composite-action/) — package setup → lint → test steps into a single reusable action
+- [Reusable Workflow](examples/reusable-workflow/) — call entire jobs with different inputs from the same or different repos
+- [JavaScript Action](examples/javascript-action/) — a PR labeler action built with @actions/core and @actions/github
+- [Docker Container Action](examples/docker-action/) — Markdown-to-HTML converter using Pandoc in a container
+
+### Automation with scripts
+- [GitHub Script](examples/github-script/) — PR welcome bot, issue triage, stale manager using the Octokit API
+
+Each example includes a real app, real tests, and a working workflow file with detailed inline comments.
 
 ## Appendix
 

@@ -1,0 +1,74 @@
+# =============================================================================
+# CI Workflow Using a Composite Action
+# =============================================================================
+# This workflow calls a composite action defined in this repo at
+# .github/actions/setup-test/action.yml. Instead of repeating the
+# checkout → setup-node → npm ci → lint → test sequence for each job,
+# we reference the composite action and customize it with inputs.
+#
+# Demonstrates: calling a local composite action, passing inputs,
+#               referencing action outputs.
+# =============================================================================
+
+name: CI with Composite Action
+
+# ---------- TRIGGERS ----------
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+# ---------- JOBS ----------
+jobs:
+
+  # ===== LINT + TEST (NODE 20) =====
+  # Uses the composite action with default inputs.
+  node-20:
+    runs-on: ubuntu-latest
+    steps:
+      # The composite action doesn't include checkout — the caller must do it
+      - uses: actions/checkout@v4
+
+      # Use the composite action from the same repo
+      - id: ci
+        uses: ./.github/actions/setup-test       # Path to the composite action
+        with:
+          node-version: '20'                     # Override the default '20' (same here, just explicit)
+          lint: 'true'
+
+      - name: Show test result
+        run: echo "Tests ${{ steps.ci.outputs.test-result }}"
+
+  # ===== LINT + TEST (NODE 22) =====
+  # Same composite action, different Node version. This would normally be
+  # 15+ lines of duplicated YAML — now it's 5 lines.
+  node-22:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - id: ci
+        uses: ./.github/actions/setup-test
+        with:
+          node-version: '22'
+          lint: 'true'
+
+      - name: Show test result
+        run: echo "Tests ${{ steps.ci.outputs.test-result }}"
+
+  # ===== TEST ONLY — NO LINT =====
+  # The same composite action but with linting disabled. Useful for quick
+  # verification runs where linting is handled elsewhere.
+  test-only:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - id: ci
+        uses: ./.github/actions/setup-test
+        with:
+          lint: 'false'                          # Skip lint — test only
+
+      - name: Show test result
+        run: echo "Tests ${{ steps.ci.outputs.test-result }}"

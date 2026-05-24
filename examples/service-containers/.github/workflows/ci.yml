@@ -1,0 +1,79 @@
+# =============================================================================
+# Service Containers CI — Node.js + PostgreSQL
+# =============================================================================
+# Runs integration tests against a real PostgreSQL database using service
+# containers. Demonstrates: services:, health checks, env vars for DB
+# credentials, running migrations before tests, lint before test.
+# =============================================================================
+
+name: Service Containers CI
+
+# ---------- TRIGGERS ----------
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+# ---------- JOBS ----------
+jobs:
+
+  # ===== LINT JOB =====
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: 'npm'
+      - run: npm ci
+      - run: npm run lint
+
+  # ===== INTEGRATION TEST JOB =====
+  # Runs only after lint passes. Spins up a PostgreSQL service container
+  # alongside the job — the tests connect to it at localhost:5432.
+  test:
+    needs: lint
+    runs-on: ubuntu-latest
+
+    # ----- Service container: PostgreSQL -----
+    # This container starts BEFORE the job steps run. GitHub creates a Docker
+    # network so the job can reach it at 'localhost'. The health check ensures
+    # the database is accepting connections before steps begin.
+    services:
+      postgres:
+        image: postgres:16                     # Official PostgreSQL image
+        env:
+          POSTGRES_USER: testuser               # Database user
+          POSTGRES_PASSWORD: testpass           # Database password
+          POSTGRES_DB: testdb                   # Database name
+        ports:
+          - 5432:5432                           # host:container — expose on localhost
+        options: >-                             # Health check: wait until PG is ready
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    # ----- Job steps -----
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: 'npm'
+
+      - run: npm ci
+
+      # The DATABASE_URL env var tells the `pg` driver how to connect.
+      # It matches the credentials set in the service container above.
+      - name: Run integration tests
+        run: npm test
+        env:
+          PGHOST: localhost
+          PGPORT: 5432
+          PGUSER: testuser
+          PGPASSWORD: testpass
+          PGDATABASE: testdb

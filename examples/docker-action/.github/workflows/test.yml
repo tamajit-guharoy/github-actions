@@ -1,0 +1,39 @@
+# =============================================================================
+# Self-Test for the Markdown-to-HTML Docker Action
+# =============================================================================
+# Tests the Docker action by converting its own README.md to HTML and
+# uploading the result as an artifact. Demonstrates: calling a local
+# Docker action, using INPUT_* env vars, consuming action outputs.
+# =============================================================================
+
+name: Test Docker Action
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      # Convert the README.md to HTML using the Docker action
+      - id: convert
+        uses: ./                            # References THIS repo's action.yml
+        with:
+          source: '*.md'                    # All Markdown files in the root
+          output: 'documentation.html'
+          title: 'Docker Action Example'
+
+      # Show the output from the action
+      - run: echo "HTML generated at ${{ steps.convert.outputs.html-path }}"
+
+      # Upload the generated HTML as an artifact for inspection
+      - uses: actions/upload-artifact@v4
+        with:
+          name: generated-html
+          path: documentation.html

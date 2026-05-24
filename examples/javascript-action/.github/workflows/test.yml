@@ -1,0 +1,41 @@
+# =============================================================================
+# Self-Test Workflow for the PR Labeler Action
+# =============================================================================
+# This workflow tests the action against itself — when a PR changes files,
+# it runs the action to label the PR. This is also how you'd use it in
+# production: on pull_request_target (NOT pull_request) to access secrets.
+#
+# IMPORTANT: This uses pull_request_target so the action can access GITHUB_TOKEN
+# with write permissions. It does NOT check out the PR code — only the
+# workflow from main. The action only reads PR metadata (changed files list)
+# via the API, which is safe.
+# =============================================================================
+
+name: Test PR Labeler Action
+
+on:
+  pull_request_target:
+    types: [opened, synchronize]
+
+permissions:
+  pull-requests: write                           # Needed to add labels
+
+jobs:
+  label:
+    runs-on: ubuntu-latest
+    steps:
+      # Check out the action's own code (from main, NOT from the PR)
+      - uses: actions/checkout@v4
+
+      # Build the action (compile index.js → dist/index.js)
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: 'npm'
+      - run: npm ci
+      - run: npm run build
+
+      # Run the action against the PR
+      - uses: ./                               # References THIS repo's action.yml
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}

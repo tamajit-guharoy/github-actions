@@ -1,0 +1,63 @@
+# =============================================================================
+# Reusable Build Workflow
+# =============================================================================
+# This workflow is NOT triggered by GitHub events. It is only called by other
+# workflows via 'uses:'. The filename starts with '_' to distinguish it from
+# event-triggered workflows.
+#
+# Demonstrates: workflow_call trigger, inputs (type, required, default),
+#               secrets declaration, outputs from jobs.
+# =============================================================================
+
+name: Reusable Build
+
+# ---------- TRIGGER ----------
+# workflow_call means this workflow is only invoked by other workflows.
+on:
+  workflow_call:
+    inputs:
+      node-version:
+        required: false
+        type: string
+        default: '20'
+      run-lint:
+        required: false
+        type: boolean
+        default: true
+    secrets:
+      NPM_TOKEN:
+        required: false                # Not required — works without it
+    outputs:
+      test-outcome:
+        value: ${{ jobs.build.outputs.result }}
+
+# ---------- JOBS ----------
+jobs:
+
+  # Single job that lints and tests. The caller can override node-version
+  # and toggle linting via inputs. Secrets are passed explicitly by the caller.
+  build:
+    runs-on: ubuntu-latest
+    outputs:
+      result: ${{ steps.test.outcome }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ inputs.node-version }}
+          cache: 'npm'
+          # If the caller passed NPM_TOKEN, use it for private registry access
+          registry-url: ${{ secrets.NPM_TOKEN && 'https://registry.npmjs.org' || '' }}
+
+      - run: npm ci
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+
+      - name: Lint
+        if: inputs.run-lint
+        run: npm run lint
+
+      - id: test
+        name: Test
+        run: npm test

@@ -1,0 +1,44 @@
+# =============================================================================
+# JavaScript Action: PR File Labeler
+# =============================================================================
+# A custom JavaScript action that auto-labels pull requests based on which
+# files were changed. Runs on Node.js 20 via the compiled dist/index.js.
+#
+# Demonstrates: JavaScript action structure, @actions/core for inputs/outputs,
+#               @actions/github for Octokit API access, ncc compilation,
+#               conditional logic in a real action.
+#
+# BUILD: Run 'npm install && npm run build' before pushing.
+#        This compiles index.js + dependencies into dist/index.js.
+# =============================================================================
+
+name: 'PR File Labeler'
+description: 'Automatically label pull requests based on changed files'
+author: 'GitHub Actions Tutorial'
+
+# ---------- INPUTS ----------
+inputs:
+  github-token:
+    description: 'GITHUB_TOKEN for API access'
+    required: true
+  rules:
+    description: 'JSON mapping of glob patterns to labels, e.g. {"src/**":"code","docs/**":"documentation"}'
+    required: false
+    default: '{"src/**":"code","docs/**":"documentation","**/*.test.*":"tests",".github/workflows/**":"ci"}'
+
+# ---------- OUTPUTS ----------
+outputs:
+  labels-added:
+    description: 'Comma-separated list of labels that were added'
+
+# ---------- RUN ----------
+# 'node20' means the action runs on Node.js 20. 'main' points to the
+# compiled bundle produced by ncc (npm run build).
+runs:
+  using: 'node20'
+  main: 'dist/index.js'
+
+# ---------- BRANDING (for Marketplace) ----------
+branding:
+  icon: 'tag'
+  color: 'blue'

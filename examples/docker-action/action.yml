@@ -1,0 +1,42 @@
+# =============================================================================
+# Docker Container Action: Markdown to HTML Converter
+# =============================================================================
+# A Docker action that converts Markdown files to HTML using Pandoc.
+# Runs inside a pandoc/latex container — no need to install Pandoc on the
+# runner. Demonstrates: Docker action structure, inputs as env vars (INPUT_*),
+# workspace access at /github/workspace, outputs via $GITHUB_OUTPUT.
+# =============================================================================
+
+name: 'Markdown to HTML'
+description: 'Convert Markdown files to a single HTML document using Pandoc'
+author: 'GitHub Actions Tutorial'
+
+# ---------- INPUTS ----------
+inputs:
+  source:
+    description: 'Glob pattern for Markdown files (e.g., "docs/*.md")'
+    required: false
+    default: '*.md'
+  output:
+    description: 'Output HTML filename'
+    required: false
+    default: 'output.html'
+  title:
+    description: 'HTML document title'
+    required: false
+    default: 'Document'
+
+outputs:
+  html-path:
+    description: 'Path to the generated HTML file (relative to workspace)'
+
+# ---------- RUN ----------
+# 'using: docker' + 'image: Dockerfile' means GitHub builds the container
+# from the Dockerfile in this directory and runs it.
+runs:
+  using: 'docker'
+  image: 'Dockerfile'
+  args:
+    - ${{ inputs.source }}
+    - ${{ inputs.output }}
+    - ${{ inputs.title }}
