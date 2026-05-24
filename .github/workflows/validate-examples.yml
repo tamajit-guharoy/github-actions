@@ -188,16 +188,16 @@ jobs:
       - name: Overall status
         run: |
           # Write a markdown summary table to the run summary page
-          echo "## Example Validation Results" >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
-          echo "| Job | Result |" >> $GITHUB_STEP_SUMMARY
-          echo "|-----|--------|" >> $GITHUB_STEP_SUMMARY
-          echo "| lint-workflows | ${{ needs.lint-workflows.result }}" >> $GITHUB_STEP_SUMMARY
-          echo "| test-nodejs | ${{ needs.test-nodejs.result }}" >> $GITHUB_STEP_SUMMARY
-          echo "| test-python | ${{ needs.test-python.result }}" >> $GITHUB_STEP_SUMMARY
-          echo "| test-monorepo-backend | ${{ needs.test-monorepo-backend.result }}" >> $GITHUB_STEP_SUMMARY
-          echo "| test-monorepo-frontend | ${{ needs.test-monorepo-frontend.result }}" >> $GITHUB_STEP_SUMMARY
-          echo "| build-js-action | ${{ needs.build-js-action.result }}" >> $GITHUB_STEP_SUMMARY
+          echo "## Example Validation Results" >> "$GITHUB_STEP_SUMMARY"
+          echo "" >> "$GITHUB_STEP_SUMMARY"
+          echo "| Job | Result |" >> "$GITHUB_STEP_SUMMARY"
+          echo "|-----|--------|" >> "$GITHUB_STEP_SUMMARY"
+          echo "| lint-workflows | ${{ needs.lint-workflows.result }}" >> "$GITHUB_STEP_SUMMARY"
+          echo "| test-nodejs | ${{ needs.test-nodejs.result }}" >> "$GITHUB_STEP_SUMMARY"
+          echo "| test-python | ${{ needs.test-python.result }}" >> "$GITHUB_STEP_SUMMARY"
+          echo "| test-monorepo-backend | ${{ needs.test-monorepo-backend.result }}" >> "$GITHUB_STEP_SUMMARY"
+          echo "| test-monorepo-frontend | ${{ needs.test-monorepo-frontend.result }}" >> "$GITHUB_STEP_SUMMARY"
+          echo "| build-js-action | ${{ needs.build-js-action.result }}" >> "$GITHUB_STEP_SUMMARY"
 
           # Build a compound failure check — exit 1 if any job failed
           FAILED=false
@@ -212,10 +212,10 @@ jobs:
           done
 
           if [ "$FAILED" = "true" ]; then
-            echo "" >> $GITHUB_STEP_SUMMARY
-            echo ":x: Some checks failed. See individual jobs above for details." >> $GITHUB_STEP_SUMMARY
+            echo "" >> "$GITHUB_STEP_SUMMARY"
+            echo ":x: Some checks failed. See individual jobs above for details." >> "$GITHUB_STEP_SUMMARY"
             exit 1
           else
-            echo "" >> $GITHUB_STEP_SUMMARY
-            echo ":white_check_mark: All examples validated successfully." >> $GITHUB_STEP_SUMMARY
+            echo "" >> "$GITHUB_STEP_SUMMARY"
+            echo ":white_check_mark: All examples validated successfully." >> "$GITHUB_STEP_SUMMARY"
           fi
