@@ -1,0 +1,56 @@
+# =============================================================================
+# Hello World — The Simplest Possible Workflow
+# =============================================================================
+# Demonstrates the absolute minimum workflow: triggers, a job, a runner,
+# and shell steps. No setup actions, no matrix, no caching — just the basics.
+# Great for verifying that GitHub Actions is working in your repo.
+# =============================================================================
+
+name: Hello World                                # Display name in the Actions tab
+
+# ---------- TRIGGERS ----------
+on:
+  push:
+    branches: [main]                             # Run on every push to main
+    paths:
+      - 'examples/hello-world/**'                # Only when hello-world example changes
+      - '.github/workflows/hello-world.yml'      # Or when THIS workflow changes
+  pull_request:
+    branches: [main]                             # Run when a PR targets main
+    paths:
+      - 'examples/hello-world/**'
+      - '.github/workflows/hello-world.yml'
+  workflow_dispatch:                             # Manual trigger from the Actions tab
+
+# ---------- JOBS ----------
+jobs:
+
+  # A single job called "greet" — the simplest possible job.
+  greet:
+    runs-on: ubuntu-latest                       # GitHub-hosted Linux runner
+
+    steps:
+      # Step 1: Clone the repository onto the runner.
+      # Without checkout, the runner has an empty directory.
+      - name: Check out the repo
+        uses: actions/checkout@v4
+
+      # Step 2: Simple shell command — echo prints to the job log.
+      - name: Say hello
+        run: echo "Hello, world! This workflow is running!"
+
+      # Step 3: Show which commit triggered this run.
+      # ${{ github.sha }} is an expression — replaced at runtime.
+      - name: Show commit SHA
+        run: echo "Triggered by commit: ${{ github.sha }}"
+
+      # Step 4: Print info about the runner environment.
+      # The pipe (|) lets us write multi-line shell scripts.
+      - name: Show runner info
+        run: |
+          echo "Runner OS: $(uname -a)"
+          echo "Current directory: $(pwd)"
+
+      # Step 5: List the example files to show checkout worked.
+      - name: List example files
+        run: ls -la examples/hello-world/

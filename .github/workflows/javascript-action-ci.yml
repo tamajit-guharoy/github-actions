@@ -1,0 +1,58 @@
+# =============================================================================
+# JavaScript Action CI — Build the PR Labeler
+# =============================================================================
+# Compiles the JavaScript action with @vercel/ncc and verifies the output.
+# Demonstrates: building a JavaScript action, ncc compilation from source,
+#               verifying compiled output before publishing.
+# =============================================================================
+
+name: JavaScript Action CI                       # Display name in the Actions tab
+
+# ---------- TRIGGERS ----------
+on:
+  push:
+    branches: [main]                             # Run on every push to main
+    paths:
+      - 'examples/javascript-action/**'          # Only when the JS action example changes
+      - '.github/workflows/javascript-action-ci.yml'  # Or when this workflow changes
+  pull_request:
+    branches: [main]
+    paths:
+      - 'examples/javascript-action/**'
+      - '.github/workflows/javascript-action-ci.yml'
+  workflow_dispatch:                             # Manual trigger from the Actions tab
+
+# ---------- JOBS ----------
+jobs:
+
+  # Single job: install, compile with ncc, verify the output bundle.
+  build:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: examples/javascript-action  # All steps run in the action directory
+    steps:
+      - uses: actions/checkout@v4                # Clone the repo
+
+      - uses: actions/setup-node@v4              # Install Node.js
+        with:
+          node-version: 20                       # Node 20 (matches the action's 'node20' runtime)
+          cache: 'npm'
+          cache-dependency-path: examples/javascript-action/package-lock.json
+
+      - run: npm ci                              # Install action dependencies (@actions/core, etc.)
+
+      # ncc bundles index.js + all dependencies into dist/index.js.
+      # This is the file that consumers run — no node_modules/ needed.
+      - name: Build (ncc compile)
+        run: npm run build                       # Runs: ncc build index.js -o dist
+
+      # Fail the job if the build didn't produce the expected output.
+      - name: Verify dist/index.js exists
+        run: test -f dist/index.js || (echo "BUILD FAILED: dist/index.js not found" && exit 1)
+
+      # Upload the compiled bundle as an artifact for inspection/download.
+      - uses: actions/upload-artifact@v4
+        with:
+          name: action-dist                      # Artifact name in the run summary
+          path: examples/javascript-action/dist/ # The compiled bundle directory

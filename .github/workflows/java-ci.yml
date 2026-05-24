@@ -1,0 +1,80 @@
+# =============================================================================
+# Java CI — Maven Calculator Example
+# =============================================================================
+# Lints (Checkstyle) and tests (JUnit 5 via Surefire) across 3 Java LTS
+# versions. Demonstrates: setup-java with Temurin distribution, Maven
+# caching, matrix across Java versions, if: always() for Surefire reports.
+# =============================================================================
+
+name: Java CI                                    # Display name in the Actions tab
+
+# ---------- TRIGGERS ----------
+on:
+  push:
+    branches: [main]                             # Run on every push to main
+    paths:
+      - 'examples/java-app/**'                   # Only when the Java example changes
+      - '.github/workflows/java-ci.yml'          # Or when THIS workflow changes
+  pull_request:
+    branches: [main]                             # Run when a PR targets main
+    paths:
+      - 'examples/java-app/**'
+      - '.github/workflows/java-ci.yml'
+  workflow_dispatch:                             # Manual trigger from the Actions tab
+
+# ---------- JOBS ----------
+jobs:
+
+  # ===== LINT JOB =====
+  # Runs Checkstyle via the maven-checkstyle-plugin configured in pom.xml.
+  lint:
+    runs-on: ubuntu-latest                       # GitHub-hosted Linux runner
+    defaults:
+      run:
+        working-directory: examples/java-app     # All run: steps use this directory
+    steps:
+      - uses: actions/checkout@v4                # Clone the repo
+
+      - uses: actions/setup-java@v4              # Install Java (Eclipse Adoptium)
+        with:
+          java-version: "21"                     # Pin compiler version for linting
+          distribution: "temurin"                # Eclipse Adoptium — free, open-source JDK
+          cache: "maven"                         # Auto-cache ~/.m2/repository
+
+      - run: mvn checkstyle:check                # Run Checkstyle (fails on violations)
+
+  # ===== TEST JOB =====
+  # Runs AFTER lint passes. Tests across 3 Java LTS versions in parallel.
+  # Uses Maven Surefire which generates XML reports in target/surefire-reports/.
+  test:
+    needs: lint                                  # Only start after lint succeeds
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: examples/java-app
+
+    # Matrix strategy: each Java version runs in its own parallel job.
+    strategy:
+      matrix:
+        java-version: [17, 21, 23]               # LTS versions + latest
+
+    steps:
+      - uses: actions/checkout@v4                # Clone the repo
+
+      - uses: actions/setup-java@v4              # Install the matrix-specific version
+        with:
+          java-version: ${{ matrix.java-version }}  # Resolves to 17, 21, or 23
+          distribution: "temurin"                # Eclipse Adoptium
+          cache: "maven"                         # Cached per Java version
+
+      # --batch-mode → non-interactive (required in CI)
+      # maven-surefire-plugin generates XML reports
+      - run: mvn --batch-mode test               # Run JUnit 5 tests
+
+      # Upload Surefire reports even when tests fail.
+      # if: always() ensures the report is available for debugging.
+      - uses: actions/upload-artifact@v4
+        if: always()                             # Run regardless of test pass/fail
+        with:
+          name: test-results-java-${{ matrix.java-version }}  # e.g., test-results-java-17
+          path: examples/java-app/target/surefire-reports/    # Surefire XML output

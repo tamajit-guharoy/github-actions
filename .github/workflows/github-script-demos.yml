@@ -1,0 +1,126 @@
+# =============================================================================
+# GitHub Script Demos — Issue Triage + Stale Manager
+# =============================================================================
+# Demonstrates actions/github-script for GitHub API automation.
+# Job 1 (triage): runs when an issue is opened — scans title/body for
+#   keywords and auto-applies labels (bug, enhancement, documentation, etc.).
+# Job 2 (stale-check): runs on manual dispatch — closes issues labeled
+#   "stale" that haven't been updated in 7+ days.
+# =============================================================================
+
+name: GitHub Script Demos                        # Display name in the Actions tab
+
+# ---------- TRIGGERS ----------
+on:
+  issues:
+    types: [opened]                              # Run when a new issue is opened
+  workflow_dispatch:                             # Manual trigger (for stale check)
+
+# ---------- PERMISSIONS ----------
+# GITHUB_TOKEN needs write access to issues and PRs for label assignment.
+permissions:
+  issues: write                                  # Allow adding labels, commenting, closing
+  pull-requests: write                           # Allow labelling PRs
+
+# ---------- JOBS ----------
+jobs:
+
+  # ===== JOB 1: AUTO-TRIAGE NEW ISSUES =====
+  # Only runs when triggered by issues: [opened] event.
+  # Scans the issue title and body for keywords and applies matching labels.
+  triage:
+    if: github.event_name == 'issues'            # Only for issue events
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/github-script@v7           # Pre-authenticated Octokit + context
+        with:
+          # The script runs as a Node.js module. Available globals:
+          #   github  → authenticated Octokit REST client
+          #   context → workflow metadata (repo, issue number, actor, payload)
+          #   core    → logging, outputs, summaries
+          script: |
+            // Extract issue data from the webhook payload
+            const issue = context.payload.issue;
+            const title = issue.title.toLowerCase();
+            const body = (issue.body || '').toLowerCase();
+            const labels = new Set();
+
+            // Keyword-based labeling rules
+            if (title.includes('bug') || body.includes('bug'))
+              labels.add('bug');                  // Bug reports
+            if (title.includes('feature') || title.includes('enhancement'))
+              labels.add('enhancement');          // Feature requests
+            if (title.includes('doc') || body.includes('documentation'))
+              labels.add('documentation');        // Documentation updates
+            if (title.includes('question') || body.includes('how do i'))
+              labels.add('question');             // Usage questions
+
+            // Always add the 'triage' label so the team knows it's unreviewed
+            labels.add('triage');
+
+            // Apply labels via the GitHub API (authenticated automatically)
+            if (labels.size > 0) {
+              await github.rest.issues.addLabels({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: context.issue.number,
+                labels: [...labels]
+              });
+              core.info(`Applied labels: ${[...labels].join(', ')}`);
+            }
+
+  # ===== JOB 2: STALE ISSUE CHECK =====
+  # Only runs on manual workflow_dispatch.
+  # Finds issues labeled "stale" with no activity for 7+ days and closes them.
+  stale-check:
+    if: github.event_name == 'workflow_dispatch'  # Only for manual trigger
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/github-script@v7
+        with:
+          script: |
+            // Fetch all open issues labeled "stale"
+            const { data: issues } = await github.rest.issues.listForRepo({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              state: 'open',                      // Only open issues
+              labels: 'stale',                    // Only those with the 'stale' label
+              per_page: 50                        // Max per page (API limit: 100)
+            });
+
+            // Calculate the cutoff date — 7 days ago
+            const cutoff = new Date();
+            cutoff.setDate(cutoff.getDate() - 7);
+            let closedCount = 0;
+
+            // Process each stale issue
+            for (const issue of issues) {
+              if (new Date(issue.updated_at) < cutoff) {
+                // Post a closing comment explaining why
+                await github.rest.issues.createComment({
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  issue_number: issue.number,
+                  body: 'Closing — stale for 7+ days with no activity. Feel free to reopen if still relevant.'
+                });
+
+                // Close the issue
+                await github.rest.issues.update({
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  issue_number: issue.number,
+                  state: 'closed'                 // Change state to closed
+                });
+
+                core.info(`Closed #${issue.number}: ${issue.title}`);
+                closedCount++;
+              }
+            }
+
+            // Write a summary to the run summary page
+            await core.summary
+              .addHeading('Stale Check Results')
+              .addRaw(`- Total stale issues found: ${issues.length}\n`)
+              .addRaw(`- Closed (inactive > 7 days): ${closedCount}\n`)
+              .addRaw(`- Still active: ${issues.length - closedCount}\n`)
+              .write();

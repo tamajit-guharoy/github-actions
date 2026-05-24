@@ -1,0 +1,220 @@
+# =============================================================================
+# Validate Examples — Tutorial Repo CI
+# =============================================================================
+# Validates all example workflow files with actionlint and runs every
+# example's tests to ensure the tutorial content is always correct.
+# Runs on push/PR to main so broken examples can't be merged.
+# =============================================================================
+
+name: Validate Examples                          # Display name in the Actions tab
+
+# ---------- TRIGGERS ----------
+on:
+  push:
+    branches: [main]                             # Run on every push to main
+  pull_request:
+    branches: [main]                             # Run when a PR targets main
+
+# ---------- JOBS ----------
+jobs:
+
+  # ===== JOB 1: LINT ALL WORKFLOW YAML FILES =====
+  # actionlint catches GitHub Actions-specific errors: deprecated versions,
+  # invalid expressions, missing required keys, shell: in composite actions.
+  lint-workflows:
+    runs-on: ubuntu-latest                       # Standard Linux runner
+    steps:
+      - uses: actions/checkout@v4                # Clone the repo
+
+      - name: Run actionlint                     # Lint all *.yml files
+        uses: reviewdog/action-actionlint@v1
+        with:
+          fail_on_error: true                    # Fail the job on any lint error
+          filter_mode: nofilter                  # Report all errors, not just diff
+
+  # ===== JOB 2: TEST ALL NODE.JS EXAMPLES =====
+  # Matrix across all Node.js-based examples so each runs in parallel.
+  # fail-fast: false → get results for all examples even if one fails.
+  test-nodejs:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false                           # Don't cancel other matrix legs
+      matrix:
+        include:
+          - name: nodejs-app                     # Express.js API
+            path: examples/nodejs-app
+            lint: true
+          - name: docker-app                     # Docker + Pages demo
+            path: examples/docker-app
+            lint: false                          # Uses node:test, no linter
+          - name: service-containers             # Node.js + PostgreSQL
+            path: examples/service-containers
+            lint: true
+          - name: composite-action               # Composite action demo
+            path: examples/composite-action
+            lint: true
+          - name: reusable-workflow              # Reusable workflow demo
+            path: examples/reusable-workflow
+            lint: true
+    defaults:
+      run:
+        working-directory: ${{ matrix.path }}    # All run: commands target the example dir
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20                       # Pin Node.js version
+          cache: 'npm'                           # Auto-cache ~/.npm
+          cache-dependency-path: ${{ matrix.path }}/package-lock.json  # Lock file location
+
+      - run: npm ci                              # Clean install (respects lockfile)
+
+      - name: Lint
+        if: matrix.lint                          # Only run if lint: true in matrix
+        run: npm run lint
+
+      - name: Test
+        run: npm test
+
+  # ===== JOB 3: TEST PYTHON EXAMPLE =====
+  # Runs Ruff linting + pytest with coverage for the Python calculator example.
+  test-python:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: examples/python-app   # All steps run in this directory
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"                 # Pin to a specific Python version
+          cache: 'pip'                           # Auto-cache pip downloads
+          cache-dependency-path: examples/python-app/pyproject.toml
+
+      - run: pip install .[dev]                  # Install package + dev dependencies
+
+      - uses: astral-sh/ruff-action@v3           # Fast Python linter (Rust-based)
+        with:
+          args: "check"                          # 'check' = lint only
+          src: "./examples/python-app"           # Target the example directory
+
+      - name: Test                               # Run pytest with coverage
+        run: pytest tests/ -v
+
+  # ===== JOB 4: TEST MONOREPO PYTHON BACKEND =====
+  test-monorepo-backend:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: examples/monorepo/backend
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: 'pip'
+          cache-dependency-path: examples/monorepo/backend/pyproject.toml
+
+      - run: pip install .[dev]
+
+      - name: Test
+        run: pytest tests/ -v
+
+  # ===== JOB 5: TEST MONOREPO NODE.JS FRONTEND =====
+  test-monorepo-frontend:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: examples/monorepo/frontend
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: 'npm'
+          cache-dependency-path: examples/monorepo/frontend/package-lock.json
+
+      - run: npm ci
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Test
+        run: npm test
+
+  # ===== JOB 6: BUILD JAVASCRIPT ACTION =====
+  # Compiles the PR labeler action with ncc and verifies dist/index.js exists.
+  build-js-action:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: examples/javascript-action
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: 'npm'
+          cache-dependency-path: examples/javascript-action/package-lock.json
+
+      - run: npm ci
+
+      - name: Build (ncc compile)                # Bundle index.js + deps → dist/index.js
+        run: npm run build
+
+      - name: Verify dist/ was created           # Fail if the build didn't produce output
+        run: test -f dist/index.js || (echo "BUILD FAILED: dist/index.js not found" && exit 1)
+
+  # ===== JOB 7: AGGREGATE RESULTS =====
+  # Shows a pass/fail summary table on the run summary page.
+  # if: always() ensures this runs even when upstream jobs fail.
+  summary:
+    needs:                                      # Wait for ALL upstream jobs
+      - lint-workflows
+      - test-nodejs
+      - test-python
+      - test-monorepo-backend
+      - test-monorepo-frontend
+      - build-js-action
+    if: always()                                # Run regardless of pass/fail
+    runs-on: ubuntu-latest
+    steps:
+      - name: Overall status
+        run: |
+          # Write a markdown summary table to the run summary page
+          echo "## Example Validation Results" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "| Job | Result |" >> $GITHUB_STEP_SUMMARY
+          echo "|-----|--------|" >> $GITHUB_STEP_SUMMARY
+          echo "| lint-workflows | ${{ needs.lint-workflows.result }}" >> $GITHUB_STEP_SUMMARY
+          echo "| test-nodejs | ${{ needs.test-nodejs.result }}" >> $GITHUB_STEP_SUMMARY
+          echo "| test-python | ${{ needs.test-python.result }}" >> $GITHUB_STEP_SUMMARY
+          echo "| test-monorepo-backend | ${{ needs.test-monorepo-backend.result }}" >> $GITHUB_STEP_SUMMARY
+          echo "| test-monorepo-frontend | ${{ needs.test-monorepo-frontend.result }}" >> $GITHUB_STEP_SUMMARY
+          echo "| build-js-action | ${{ needs.build-js-action.result }}" >> $GITHUB_STEP_SUMMARY
+
+          # Build a compound failure check — exit 1 if any job failed
+          FAILED=false
+          for result in \
+            "${{ needs.lint-workflows.result }}" \
+            "${{ needs.test-nodejs.result }}" \
+            "${{ needs.test-python.result }}" \
+            "${{ needs.test-monorepo-backend.result }}" \
+            "${{ needs.test-monorepo-frontend.result }}" \
+            "${{ needs.build-js-action.result }}"; do
+            if [ "$result" = "failure" ]; then FAILED=true; fi
+          done
+
+          if [ "$FAILED" = "true" ]; then
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo ":x: Some checks failed. See individual jobs above for details." >> $GITHUB_STEP_SUMMARY
+            exit 1
+          else
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo ":white_check_mark: All examples validated successfully." >> $GITHUB_STEP_SUMMARY
+          fi

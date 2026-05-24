@@ -1,0 +1,75 @@
+# =============================================================================
+# Service Containers CI — PostgreSQL Integration Tests
+# =============================================================================
+# Runs Node.js integration tests against a REAL PostgreSQL database using
+# GitHub Actions service containers. Demonstrates: services: block, Docker
+# health checks, env vars for DB credentials, ephemeral database per run.
+# =============================================================================
+
+name: Service Containers CI                      # Display name in the Actions tab
+
+# ---------- TRIGGERS ----------
+on:
+  push:
+    branches: [main]                             # Run on every push to main
+    paths:
+      - 'examples/service-containers/**'         # Only when this example changes
+      - '.github/workflows/service-containers-ci.yml'  # Or when this workflow changes
+  pull_request:
+    branches: [main]
+    paths:
+      - 'examples/service-containers/**'
+      - '.github/workflows/service-containers-ci.yml'
+  workflow_dispatch:                             # Manual trigger from the Actions tab
+
+# ---------- JOBS ----------
+jobs:
+
+  # Single job that runs integration tests with a PostgreSQL sidecar.
+  test:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: examples/service-containers  # All steps run in the example dir
+
+    # ----- SERVICE CONTAINER: PostgreSQL -----
+    # This container starts BEFORE the job steps. GitHub creates a Docker
+    # network so the job can reach it at 'localhost'. The health check
+    # ensures the database accepts connections before steps begin.
+    services:
+      postgres:
+        image: postgres:16                       # Official PostgreSQL Docker image
+        env:
+          POSTGRES_USER: testuser                 # Database user for tests
+          POSTGRES_PASSWORD: testpass             # Database password for tests
+          POSTGRES_DB: testdb                     # Database name for tests
+        ports:
+          - 5432:5432                             # host:container — expose on localhost
+        options: >-                               # Health check: wait until PG is ready
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    # ----- JOB STEPS -----
+    steps:
+      - uses: actions/checkout@v4                # Clone the repo
+
+      - uses: actions/setup-node@v4              # Install Node.js
+        with:
+          node-version: 20                       # Pin the Node version
+          cache: 'npm'                           # Auto-cache ~/.npm
+          cache-dependency-path: examples/service-containers/package-lock.json
+
+      - run: npm ci                              # Clean install (respects lockfile)
+
+      # The env vars tell the pg driver how to connect to the service container.
+      # They match the credentials configured in the services: block above.
+      - name: Run integration tests
+        run: npm test
+        env:
+          PGHOST: localhost                      # Connect to the service container
+          PGPORT: 5432                           # Mapped port
+          PGUSER: testuser                       # Same as POSTGRES_USER above
+          PGPASSWORD: testpass                   # Same as POSTGRES_PASSWORD above
+          PGDATABASE: testdb                     # Same as POSTGRES_DB above

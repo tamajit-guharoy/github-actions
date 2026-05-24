@@ -1,0 +1,53 @@
+# =============================================================================
+# Reusable Workflow CI
+# =============================================================================
+# Calls the reusable build workflow (_build.yml) multiple times with
+# different inputs. Demonstrates: calling a reusable workflow via 'uses:',
+# passing inputs and secrets, consuming outputs via needs.*.outputs.*,
+# calling the same workflow with different parameters.
+# =============================================================================
+
+name: Reusable Workflow CI                       # Display name in the Actions tab
+
+# ---------- TRIGGERS ----------
+on:
+  push:
+    branches: [main]                             # Run on every push to main
+    paths:
+      - 'examples/reusable-workflow/**'          # Only when the reusable workflow example changes
+      - '.github/workflows/reusable-workflow-ci.yml'  # Or when this workflow changes
+  pull_request:
+    branches: [main]
+    paths:
+      - 'examples/reusable-workflow/**'
+      - '.github/workflows/reusable-workflow-ci.yml'
+  workflow_dispatch:                             # Manual trigger from the Actions tab
+
+# ---------- JOBS ----------
+jobs:
+
+  # ===== CALL WITH DEFAULT INPUTS =====
+  # No 'with:' → uses all defaults (node-version: 20, run-lint: true).
+  # The reusable workflow runs as a SEPARATE job with its own runner.
+  build-default:
+    uses: ./examples/reusable-workflow/.github/workflows/_build.yml  # Path to the reusable workflow
+
+  # ===== CALL WITH NODE 22 =====
+  # Override the node-version input. Same workflow, different version.
+  # Each 'uses:' creates a fresh runner — no state shared between calls.
+  build-node-22:
+    uses: ./examples/reusable-workflow/.github/workflows/_build.yml
+    with:
+      node-version: '22'                         # Override: use Node 22
+
+  # ===== REPORT RESULTS =====
+  # Shows how to consume outputs from a reusable workflow.
+  # needs.*.outputs.outcome returns 'success', 'failure', or 'skipped'.
+  report:
+    needs: [build-default, build-node-22]        # Wait for both calls to finish
+    runs-on: ubuntu-latest
+    steps:
+      - name: Show outcomes                      # Print each call's result
+        run: |
+          echo "Default (Node 20): ${{ needs.build-default.outputs.test-outcome }}"
+          echo "Node 22:           ${{ needs.build-node-22.outputs.test-outcome }}"

@@ -1,0 +1,55 @@
+# =============================================================================
+# Docker Action CI — Markdown to HTML Converter
+# =============================================================================
+# Tests the Docker container action by converting README.md to HTML.
+# Demonstrates: calling a local Docker action, passing inputs to a Docker
+#               container, consuming action outputs, uploading the result.
+# =============================================================================
+
+name: Docker Action CI                           # Display name in the Actions tab
+
+# ---------- TRIGGERS ----------
+on:
+  push:
+    branches: [main]                             # Run on every push to main
+    paths:
+      - 'examples/docker-action/**'              # Only when the Docker action example changes
+      - '.github/workflows/docker-action-ci.yml' # Or when this workflow changes
+  pull_request:
+    branches: [main]
+    paths:
+      - 'examples/docker-action/**'
+      - '.github/workflows/docker-action-ci.yml'
+  workflow_dispatch:                             # Manual trigger from the Actions tab
+
+# ---------- JOBS ----------
+jobs:
+
+  # Single job: build the Docker action image and run it.
+  # The action's Dockerfile is built on the runner, then executed with the
+  # provided inputs. Outputs are captured from $GITHUB_OUTPUT.
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4                # Clone the repo (includes the action)
+
+      # Call the Docker action from the local repo.
+      # The action lives at examples/docker-action/ (contains action.yml + Dockerfile).
+      # GitHub builds the Dockerfile, starts the container, and runs entrypoint.sh.
+      - id: convert                              # id so we can reference outputs
+        uses: ./examples/docker-action           # Path to the Docker action directory
+        with:
+          source: '*.md'                         # Input: glob pattern for Markdown files
+          output: 'documentation.html'           # Input: output filename
+          title: 'Docker Action Example'         # Input: HTML <title>
+
+      # The action writes outputs to $GITHUB_OUTPUT.
+      # We read them via steps.<id>.outputs.<output-name>.
+      - name: Show result
+        run: echo "HTML generated at ${{ steps.convert.outputs.html-path }}"
+
+      # Upload the generated HTML as an artifact for manual inspection.
+      - uses: actions/upload-artifact@v4
+        with:
+          name: generated-html                   # Artifact name
+          path: documentation.html               # The file produced by the Docker action

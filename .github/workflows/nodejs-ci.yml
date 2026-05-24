@@ -1,0 +1,82 @@
+# =============================================================================
+# Node.js CI — Express API Example
+# =============================================================================
+# Lints and tests the Node.js example app across 3 Node.js LTS versions.
+# Demonstrates: sequential jobs (needs), matrix strategy, npm caching,
+#               artifact upload, working-directory for subdirectory targets.
+# =============================================================================
+
+name: Node.js CI                                 # Display name in the Actions tab
+
+# ---------- TRIGGERS ----------
+on:
+  push:
+    branches: [main]                             # Run on every push to main
+    paths:
+      - 'examples/nodejs-app/**'                 # Only when the Node.js example changes
+      - '.github/workflows/nodejs-ci.yml'        # Or when THIS workflow changes
+  pull_request:
+    branches: [main]                             # Run when a PR targets main
+    paths:
+      - 'examples/nodejs-app/**'
+      - '.github/workflows/nodejs-ci.yml'
+  workflow_dispatch:                             # Manual trigger from the Actions tab
+
+# ---------- JOBS ----------
+jobs:
+
+  # ===== LINT JOB =====
+  # Runs first (no 'needs' = starts immediately). If lint fails, test is skipped
+  # — saving runner minutes on cheap-to-catch errors.
+  lint:
+    runs-on: ubuntu-latest                       # GitHub-hosted Linux runner
+    defaults:
+      run:
+        working-directory: examples/nodejs-app   # All run: steps use this directory
+    steps:
+      - uses: actions/checkout@v4                # Clone the repo
+
+      - uses: actions/setup-node@v4              # Install Node.js
+        with:
+          node-version: 20                       # Pin the lint version
+          cache: 'npm'                           # Auto-cache ~/.npm for fast installs
+          cache-dependency-path: examples/nodejs-app/package-lock.json  # Lock file location
+
+      - run: npm ci                              # Clean install (respects lockfile)
+
+      - run: npm run lint                        # ESLint — fails on any warning/error
+
+  # ===== TEST JOB =====
+  # Runs AFTER lint passes ('needs: lint'). Tests across 3 Node versions in
+  # parallel via matrix strategy — 3 runners, 3 versions, one definition.
+  test:
+    needs: lint                                  # Only start after lint succeeds
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: examples/nodejs-app   # All run: steps use this directory
+
+    # Matrix strategy: each value becomes a separate parallel job runner.
+    strategy:
+      matrix:
+        node-version: [18, 20, 22]               # Test against 3 LTS versions
+
+    steps:
+      - uses: actions/checkout@v4                # Clone the repo
+
+      - uses: actions/setup-node@v4              # Install the matrix-specific version
+        with:
+          node-version: ${{ matrix.node-version }}  # Resolves to 18, 20, or 22
+          cache: 'npm'                           # Cached per Node version
+          cache-dependency-path: examples/nodejs-app/package-lock.json
+
+      - run: npm ci                              # Install dependencies
+
+      - run: npm test                            # Run Jest tests
+
+      # Upload coverage report as a workflow artifact. Each matrix leg
+      # gets a unique name to avoid conflicts.
+      - uses: actions/upload-artifact@v4
+        with:
+          name: coverage-node-${{ matrix.node-version }}  # e.g., coverage-node-18
+          path: examples/nodejs-app/coverage/            # Directory to upload

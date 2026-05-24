@@ -1,0 +1,63 @@
+# =============================================================================
+# Composite Action CI
+# =============================================================================
+# Tests the composite action by calling it with different Node.js versions.
+# Demonstrates: calling a local composite action via './path', passing inputs,
+#               consuming action outputs via steps.<id>.outputs.*.
+# =============================================================================
+
+name: Composite Action CI                        # Display name in the Actions tab
+
+# ---------- TRIGGERS ----------
+on:
+  push:
+    branches: [main]                             # Run on every push to main
+    paths:
+      - 'examples/composite-action/**'           # Only when composite-action example changes
+      - '.github/workflows/composite-action-ci.yml'  # Or when this workflow changes
+  pull_request:
+    branches: [main]
+    paths:
+      - 'examples/composite-action/**'
+      - '.github/workflows/composite-action-ci.yml'
+  workflow_dispatch:                             # Manual trigger from the Actions tab
+
+# ---------- JOBS ----------
+jobs:
+
+  # ===== TEST WITH NODE 20 =====
+  # Calls the composite action with default inputs.
+  # The checkout step is OUTSIDE the composite action — callers must do it themselves.
+  node-20:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4                # Clone the repo (includes the action)
+
+      # Call the composite action from the local repo.
+      # The action lives at examples/composite-action/.github/actions/setup-test/
+      - id: ci                                   # id so we can reference outputs
+        uses: ./examples/composite-action/.github/actions/setup-test  # Local composite action path
+        with:
+          node-version: '20'                     # Input: Node version to install
+          lint: 'true'                           # Input: run linter? (true/false)
+
+      # Reference the action's output — defined in action.yml as test-result
+      - name: Show test result
+        run: echo "Tests ${{ steps.ci.outputs.test-result }}"
+
+  # ===== TEST WITH NODE 22 =====
+  # Same composite action, different Node version. Without composite actions,
+  # this would be ~20 lines of duplicated YAML. Now it's 5 lines.
+  node-22:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4                # Clone the repo
+
+      - id: ci                                   # Same action, different inputs
+        uses: ./examples/composite-action/.github/actions/setup-test
+        with:
+          node-version: '22'                     # Override: use Node 22 instead of 20
+          lint: 'true'                           # Still run linting
+
+      - name: Show test result
+        run: echo "Tests ${{ steps.ci.outputs.test-result }}"
