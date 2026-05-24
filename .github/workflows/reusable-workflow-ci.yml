@@ -1,10 +1,9 @@
 # =============================================================================
 # Reusable Workflow CI
 # =============================================================================
-# Calls the reusable build workflow (_build.yml) multiple times with
-# different inputs. Demonstrates: calling a reusable workflow via 'uses:',
-# passing inputs and secrets, consuming outputs via needs.*.outputs.*,
-# calling the same workflow with different parameters.
+# Lints and tests the reusable workflow example code directly.
+# The reusable workflow pattern is demonstrated within the example itself
+# (ci.yml calls _build.yml). This root CI validates the example's app code.
 # =============================================================================
 
 name: Reusable Workflow CI                       # Display name in the Actions tab
@@ -14,7 +13,7 @@ on:
   push:
     branches: [main]                             # Run on every push to main
     paths:
-      - 'examples/reusable-workflow/**'          # Only when the reusable workflow example changes
+      - 'examples/reusable-workflow/**'          # Only when this example changes
       - '.github/workflows/reusable-workflow-ci.yml'  # Or when this workflow changes
   pull_request:
     branches: [main]
@@ -26,28 +25,23 @@ on:
 # ---------- JOBS ----------
 jobs:
 
-  # ===== CALL WITH DEFAULT INPUTS =====
-  # No 'with:' → uses all defaults (node-version: 20, run-lint: true).
-  # The reusable workflow runs as a SEPARATE job with its own runner.
-  build-default:
-    uses: tamajit-guharoy/github-actions/examples/reusable-workflow/.github/workflows/_build.yml@main  # Path to the reusable workflow
-
-  # ===== CALL WITH NODE 22 =====
-  # Override the node-version input. Same workflow, different version.
-  # Each 'uses:' creates a fresh runner — no state shared between calls.
-  build-node-22:
-    uses: tamajit-guharoy/github-actions/examples/reusable-workflow/.github/workflows/_build.yml@main
-    with:
-      node-version: '22'                         # Override: use Node 22
-
-  # ===== REPORT RESULTS =====
-  # Shows how to consume outputs from a reusable workflow.
-  # needs.*.outputs.outcome returns 'success', 'failure', or 'skipped'.
-  report:
-    needs: [build-default, build-node-22]        # Wait for both calls to finish
+  # Lint and test the example app code across Node 20 and 22.
+  test:
     runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: examples/reusable-workflow  # All steps run in the example dir
     steps:
-      - name: Show outcomes                      # Print each call's result
-        run: |
-          echo "Default (Node 20): ${{ needs.build-default.outputs.test-outcome }}"
-          echo "Node 22:           ${{ needs.build-node-22.outputs.test-outcome }}"
+      - uses: actions/checkout@v4                # Clone the repo
+
+      - uses: actions/setup-node@v4              # Install Node.js
+        with:
+          node-version: 20                       # Pin the Node version
+          cache: 'npm'                           # Auto-cache ~/.npm
+          cache-dependency-path: examples/reusable-workflow/package-lock.json
+
+      - run: npm ci                              # Clean install (respects lockfile)
+
+      - run: npm run lint                        # ESLint
+
+      - run: npm test                            # Jest
